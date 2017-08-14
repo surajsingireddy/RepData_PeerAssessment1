@@ -1,0 +1,75 @@
+---
+title: "Reproducible Research: Peer Assessment 1"
+output: 
+  html_document:
+    keep_md: true
+---
+
+
+## Loading and preprocessing the data
+
+```{r}
+download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip", "activity.zip")
+unzip("activity.zip")
+activity <- read.csv("activity.csv")
+```
+
+## What is mean total number of steps taken per day?
+
+```{r}
+sum_table <- aggregate(steps ~ date, activity, sum)
+colnames(sum_table) <- c("Date", "Steps")
+
+hist(sum_table$Steps, main="Total Steps per Day", xlab="Steps", breaks=5)
+
+mean_steps <- as.integer(mean(sum_table$Steps))
+median_steps <- as.integer(median(sum_table$Steps))
+```
+
+## What is the average daily activity pattern?
+
+```{r}
+library(ggplot2)
+library(plyr)
+
+steps_per_interval <- ddply(activity, .(interval), summarize, Avg=mean(steps))
+
+plot <- ggplot(steps_per_interval, aes(x=interval, y=Avg), xlab="Interval", ylab="Average Number of Steps")
+plot+geom_line()+xlab("Interval")+ylab("Average Number of Steps")+ggtitle("Average Number of Steps per Interval")
+
+maxSteps <- steps_per_interval[max(steps_per_interval$Avg),1]
+```
+
+## Imputing missing values
+
+```{r}
+activity_na <- activity[is.na(activity$steps),]
+
+num_na <- nrow(activity[is.na(activity$steps),])
+
+avg_table <- ddply(activity_clean, .(interval,day), summarize, Avg=mean(steps))
+new_data <- merge(activity_na, avg_table, by=c("interval", "day"))
+new_data <- new_data[,c(6,4,1,2,5)]
+colnames(new_data) <- c("steps", "date", "interval", "day", "DateTime")
+new_data <- rbind(activity_clean, new_data)
+
+sum_table <- aggregate(steps ~ date, new_data, sum)
+colnames(sum_table) <- c("Date", "Steps")
+
+hist(sum_table$Steps, breaks=5, xlab="Steps", main = "Total Steps per Day with NAs Fixed", col="Black")
+hist(sum_table$Steps, breaks=5, xlab="Steps", main = "Total Steps per Day with NAs Fixed", col="Grey", add=T)
+legend("topright", c("Imputed Data", "Non-NA Data"), fill=c("black", "grey") )
+
+```
+
+## Are there differences in activity patterns between weekdays and weekends?
+
+```{r}
+library(lattice)
+
+new_data$DayCategory <- ifelse(new_data$day %in% c("Saturday", "Sunday"), "Weekend", "Weekday")
+interval_table <- ddply(new_data, .(interval, DayCategory), summarize, Avg=mean(steps))
+xyplot(Avg~interval|DayCategory, data=interval_table, type="l",  layout = c(1,2),
+       main="Average Steps per Interval Based on Type of Day", 
+       ylab="Average Number of Steps", xlab="Interval")
+```
